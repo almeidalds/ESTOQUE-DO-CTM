@@ -1,0 +1,60 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function hasRole(role) {
+      return request.auth.token.role == role;
+    }
+
+    // SETTINGS
+    match /settings/app {
+      allow read: if request.auth != null;
+      allow write: if false; // Only via Cloud Function
+    }
+
+    // MISSIONARIES
+    match /missionaries/{missionaryId} {
+      allow read: if request.auth != null;
+      // Direct write allowed only for Admin/Manager. 
+      // Helpdesk MUST use updateMissionaryProfile Cloud Function to ensure field-level security.
+      allow write: if hasRole('admin') || hasRole('manager');
+      
+      match /terms/{termId} {
+        allow read: if request.auth != null;
+        allow write: if false; // Only via Cloud Function
+      }
+    }
+
+    // TICKETS
+    match /tickets/{ticketId} {
+      allow read: if request.auth != null;
+      // Creation allowed via direct SDK if simple, but function preferred.
+      // Letting simple create/update for now to support offline-first if needed, 
+      // but Function is safer for logic.
+      allow create: if request.auth != null;
+      allow update: if hasRole('admin') || hasRole('manager') || hasRole('helpdesk');
+    }
+
+    // LOANS & TRANSACTIONS
+    match /loans/{loanId} {
+      allow read: if request.auth != null;
+      allow write: if hasRole('admin') || hasRole('manager'); // Helpdesk uses Functions
+    }
+
+    match /transactions/{txId} {
+      allow read: if request.auth != null;
+      allow write: if hasRole('admin') || hasRole('manager'); // Helpdesk uses Functions
+    }
+
+    match /items/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if hasRole('admin') || hasRole('manager');
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if hasRole('admin');
+      allow write: if false; 
+    }
+  }
+}
